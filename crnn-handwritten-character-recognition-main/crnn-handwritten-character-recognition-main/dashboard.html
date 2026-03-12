@@ -1,0 +1,1946 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CRNN · Handwriting Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #050508;
+            --surface: #0d0d14;
+            --surface2: #141420;
+            --border: rgba(255, 255, 255, 0.07);
+            --border2: rgba(255, 255, 255, 0.12);
+            --accent: #7DF9C0;
+            --accent2: #B8A9FF;
+            --accent3: #FF8A65;
+            --text: #f0eff8;
+            --muted: #6b6a80;
+            --danger: #ff5f6d;
+            --glow: rgba(125, 249, 192, 0.15);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(125, 249, 192, 0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(125, 249, 192, 0.015) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(120px);
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.25;
+            animation: orbFloat 18s ease-in-out infinite;
+        }
+
+        .orb1 {
+            width: 600px;
+            height: 600px;
+            background: #7DF9C0;
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb2 {
+            width: 500px;
+            height: 500px;
+            background: #B8A9FF;
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -9s;
+        }
+
+        .orb3 {
+            width: 300px;
+            height: 300px;
+            background: #FF8A65;
+            top: 40%;
+            left: 40%;
+            animation-delay: -4s;
+            opacity: 0.12;
+        }
+
+        @keyframes orbFloat {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            33% {
+                transform: translate(30px, -20px) scale(1.05);
+            }
+
+            66% {
+                transform: translate(-20px, 30px) scale(0.97);
+            }
+        }
+
+        .shell {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 32px;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 28px 0 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            border: 1.5px solid var(--accent);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .logo-icon::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(125, 249, 192, 0.15), transparent);
+        }
+
+        .logo-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .logo-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            color: var(--text);
+        }
+
+        .logo-sub {
+            font-size: 10px;
+            color: var(--accent);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .header-badges {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .badge {
+            padding: 6px 14px;
+            border-radius: 100px;
+            font-size: 11px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            border: 1px solid;
+        }
+
+        .badge-live {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(125, 249, 192, 0.06);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .badge-live::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.4;
+                transform: scale(0.7);
+            }
+        }
+
+        .badge-model {
+            border-color: var(--border2);
+            color: var(--muted);
+        }
+
+        /* server badge highlight when connected */
+        .badge-model.connected {
+            border-color: rgba(125, 249, 192, 0.4);
+            color: var(--accent);
+        }
+
+        .badge-model.offline {
+            border-color: rgba(255, 138, 101, 0.4);
+            color: var(--accent3);
+        }
+
+        .hero {
+            padding: 60px 0 48px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+        }
+
+        .hero-text h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(36px, 4.5vw, 58px);
+            font-weight: 800;
+            line-height: 1.05;
+            letter-spacing: -0.02em;
+            margin-bottom: 16px;
+        }
+
+        .hero-text h1 em {
+            font-family: 'Instrument Serif', serif;
+            font-style: italic;
+            color: var(--accent);
+        }
+
+        .hero-text p {
+            font-size: 14px;
+            line-height: 1.8;
+            color: var(--muted);
+            max-width: 420px;
+            margin-bottom: 32px;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 32px;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .stat-val {
+            font-family: 'Syne', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .stat-val span {
+            color: var(--accent);
+            font-size: 16px;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            letter-spacing: 0.18em;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        .arch-diagram {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .arch-diagram::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        }
+
+        .arch-label {
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .arch-node {
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 11px;
+            letter-spacing: 0.05em;
+            text-align: center;
+            line-height: 1.4;
+            min-width: 72px;
+        }
+
+        .arch-node.cnn {
+            background: rgba(125, 249, 192, 0.1);
+            border: 1px solid rgba(125, 249, 192, 0.3);
+            color: var(--accent);
+        }
+
+        .arch-node.rnn {
+            background: rgba(184, 169, 255, 0.1);
+            border: 1px solid rgba(184, 169, 255, 0.3);
+            color: var(--accent2);
+        }
+
+        .arch-node.ctc {
+            background: rgba(255, 138, 101, 0.1);
+            border: 1px solid rgba(255, 138, 101, 0.3);
+            color: var(--accent3);
+        }
+
+        .arch-node.out {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border2);
+            color: var(--text);
+        }
+
+        .arch-arrow {
+            color: var(--muted);
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .arch-detail {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .arch-detail-item {
+            padding: 12px;
+            background: var(--surface2);
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .arch-detail-key {
+            font-size: 9px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .arch-detail-val {
+            font-size: 12px;
+            color: var(--text);
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            padding-bottom: 48px;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .panel-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        .panel-subtitle {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .upload-zone {
+            margin: 24px;
+            border: 1.5px dashed rgba(125, 249, 192, 0.2);
+            border-radius: 16px;
+            padding: 48px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            background: rgba(125, 249, 192, 0.02);
+        }
+
+        .upload-zone:hover,
+        .upload-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(125, 249, 192, 0.06);
+            box-shadow: 0 0 40px rgba(125, 249, 192, 0.08) inset;
+        }
+
+        .upload-zone input[type=file] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .upload-icon {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 16px;
+            border: 1.5px solid rgba(125, 249, 192, 0.3);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(125, 249, 192, 0.06);
+        }
+
+        .upload-main-text {
+            font-family: 'Syne', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .upload-sub-text {
+            font-size: 11px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .upload-formats {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .format-chip {
+            padding: 3px 10px;
+            border: 1px solid var(--border2);
+            border-radius: 100px;
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 0.1em;
+        }
+
+        .image-preview-wrap {
+            margin: 24px;
+            display: none;
+        }
+
+        .image-preview-wrap.show {
+            display: block;
+        }
+
+        .image-canvas-wrap {
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            position: relative;
+            background: #000;
+        }
+
+        #previewCanvas {
+            display: block;
+            width: 100%;
+            max-height: 240px;
+            object-fit: contain;
+        }
+
+        .image-overlay-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 10px;
+            color: var(--accent);
+            letter-spacing: 0.1em;
+        }
+
+        .image-meta {
+            display: flex;
+            gap: 16px;
+            margin-top: 14px;
+        }
+
+        .image-meta-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .image-meta-key {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--muted);
+        }
+
+        .image-meta-val {
+            font-size: 12px;
+            color: var(--text);
+        }
+
+        .engine-selector {
+            margin: 0 24px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .engine-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--muted);
+        }
+
+        .engine-options {
+            display: flex;
+            gap: 8px;
+            background: var(--surface);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .engine-opt {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text);
+            font-size: 11px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .engine-opt.active {
+            background: var(--surface2);
+            color: var(--accent);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .process-btn {
+            margin: 0 24px 24px;
+            width: calc(100% - 48px);
+            padding: 16px;
+            background: var(--accent);
+            color: #050508;
+            border: none;
+            border-radius: 14px;
+            font-family: 'Syne', sans-serif;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.25s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .process-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), transparent);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .process-btn:hover::before {
+            opacity: 1;
+        }
+
+        .process-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(125, 249, 192, 0.4);
+        }
+
+        .process-btn:active {
+            transform: translateY(0);
+        }
+
+        .process-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .process-btn.loading .btn-text {
+            display: none;
+        }
+
+        .process-btn.loading .btn-spinner {
+            display: flex;
+        }
+
+        .btn-spinner {
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(0, 0, 0, 0.3);
+            border-top-color: #050508;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .reset-btn {
+            margin: 0 24px 16px;
+            background: transparent;
+            border: 1px solid var(--border2);
+            color: var(--muted);
+            width: calc(100% - 48px);
+            padding: 10px;
+            border-radius: 10px;
+            font-family: 'DM Mono', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            letter-spacing: 0.1em;
+            transition: all 0.2s;
+        }
+
+        .reset-btn:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .result-empty {
+            padding: 60px 24px;
+            text-align: center;
+            color: var(--muted);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .result-empty-icon {
+            width: 48px;
+            height: 48px;
+            border: 1px dashed var(--border2);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.5;
+        }
+
+        .result-empty p {
+            font-size: 12px;
+            line-height: 1.6;
+            max-width: 200px;
+        }
+
+        .result-content {
+            padding: 24px;
+            display: none;
+        }
+
+        .result-content.show {
+            display: block;
+        }
+
+        .result-text-box {
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .result-text-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+        }
+
+        .result-text-label {
+            font-size: 9px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 12px;
+        }
+
+        .result-text-output {
+            font-family: 'Instrument Serif', serif;
+            font-size: 22px;
+            line-height: 1.6;
+            color: var(--text);
+            word-break: break-word;
+            min-height: 48px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .result-chars {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 16px;
+        }
+
+        .char-token {
+            padding: 4px 10px;
+            background: rgba(125, 249, 192, 0.06);
+            border: 1px solid rgba(125, 249, 192, 0.15);
+            border-radius: 6px;
+            font-size: 16px;
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            animation: tokenPop 0.3s ease both;
+        }
+
+        @keyframes tokenPop {
+            from {
+                opacity: 0;
+                transform: scale(0.7) translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            transition: border-color 0.2s;
+        }
+
+        .metric-card:hover {
+            border-color: var(--border2);
+        }
+
+        .metric-val {
+            font-family: 'Syne', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .metric-val.green {
+            color: var(--accent);
+        }
+
+        .metric-val.purple {
+            color: var(--accent2);
+        }
+
+        .metric-val.orange {
+            color: var(--accent3);
+        }
+
+        .metric-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--muted);
+        }
+
+        .conf-bar-wrap {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .conf-bar-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .conf-bar-title {
+            font-size: 10px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .conf-bar-pct {
+            font-family: 'Syne', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .conf-bar-track {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 100px;
+            overflow: hidden;
+        }
+
+        .conf-bar-fill {
+            height: 100%;
+            border-radius: 100px;
+            background: linear-gradient(90deg, var(--accent2), var(--accent));
+            width: 0;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .pipeline-wrap {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .pipeline-title {
+            font-size: 9px;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        .pipeline-steps {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .pipeline-step {
+            flex: 1;
+            height: 4px;
+            border-radius: 100px;
+            background: rgba(255, 255, 255, 0.07);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pipeline-step.done::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 100px;
+            background: var(--accent);
+            animation: fillStep 0.4s ease forwards;
+        }
+
+        .pipeline-step.done.s2::after {
+            background: var(--accent2);
+            animation-delay: 0.1s;
+        }
+
+        .pipeline-step.done.s3::after {
+            background: var(--accent3);
+            animation-delay: 0.2s;
+        }
+
+        .pipeline-step.done.s4::after {
+            background: var(--accent);
+            animation-delay: 0.3s;
+        }
+
+        .pipeline-step.done.s5::after {
+            background: var(--accent2);
+            animation-delay: 0.4s;
+        }
+
+        @keyframes fillStep {
+            from {
+                transform: scaleX(0);
+                transform-origin: left;
+            }
+
+            to {
+                transform: scaleX(1);
+                transform-origin: left;
+            }
+        }
+
+        .pipeline-sep {
+            width: 2px;
+            height: 2px;
+            background: var(--muted);
+            border-radius: 50%;
+            flex-shrink: 0;
+            opacity: 0.4;
+        }
+
+        .pipeline-labels {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+            font-size: 8px;
+            color: var(--muted);
+            letter-spacing: 0.08em;
+        }
+
+        .pipeline-lbl {
+            flex: 1;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .copy-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: transparent;
+            border: 1px solid var(--border2);
+            color: var(--muted);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            cursor: pointer;
+            letter-spacing: 0.08em;
+            transition: all 0.2s;
+            margin-top: 12px;
+        }
+
+        .copy-btn:hover,
+        .copy-btn.copied {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .history-section {
+            margin-bottom: 60px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+
+        .section-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text);
+        }
+
+        .section-count {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .history-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            animation: cardIn 0.4s ease both;
+            transition: border-color 0.2s, transform 0.2s;
+            cursor: pointer;
+        }
+
+        .history-card:hover {
+            border-color: var(--border2);
+            transform: translateY(-3px);
+        }
+
+        @keyframes cardIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .history-thumb {
+            width: 100%;
+            height: 70px;
+            object-fit: contain;
+            border-radius: 8px;
+            background: var(--surface2);
+            display: block;
+        }
+
+        .history-result {
+            font-family: 'Instrument Serif', serif;
+            font-size: 20px;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-conf {
+            font-size: 10px;
+            padding: 3px 10px;
+            border-radius: 100px;
+            border: 1px solid rgba(125, 249, 192, 0.2);
+            color: var(--accent);
+        }
+
+        .history-time {
+            font-size: 10px;
+            color: var(--muted);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: 12px;
+            padding: 14px 20px;
+            font-size: 12px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 100;
+            transform: translateY(80px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .toast-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent);
+            border-radius: 50%;
+        }
+
+        #processingOverlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(5, 5, 8, 0.85);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            border-radius: 20px;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        #processingOverlay.show {
+            display: flex;
+        }
+
+        .scan-line {
+            width: 180px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            animation: scan 1.5s ease-in-out infinite;
+        }
+
+        @keyframes scan {
+            0% {
+                transform: scaleX(0.2) translateX(-100px);
+                opacity: 0;
+            }
+
+            50% {
+                transform: scaleX(1) translateX(0);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scaleX(0.2) translateX(100px);
+                opacity: 0;
+            }
+        }
+
+        .processing-text {
+            font-size: 11px;
+            color: var(--accent);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        @media (max-width: 900px) {
+            .hero {
+                grid-template-columns: 1fr;
+                gap: 40px;
+            }
+
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-stats {
+                flex-wrap: wrap;
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .shell {
+                padding: 0 16px;
+            }
+
+            .header-badges {
+                display: none;
+            }
+
+            .metrics-row {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .draw-section {
+            padding: 0 24px 24px;
+        }
+
+        .draw-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            color: var(--muted);
+            font-size: 10px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+        }
+
+        .draw-divider::before,
+        .draw-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        #drawCanvas {
+            width: 100%;
+            height: 120px;
+            border-radius: 12px;
+            border: 1.5px dashed rgba(184, 169, 255, 0.3);
+            background: rgba(184, 169, 255, 0.02);
+            cursor: crosshair;
+            display: block;
+            touch-action: none;
+        }
+
+        .draw-controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+            justify-content: flex-end;
+        }
+
+        .draw-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border2);
+            background: transparent;
+            color: var(--muted);
+            font-family: 'DM Mono', monospace;
+            font-size: 10px;
+            cursor: pointer;
+            letter-spacing: 0.08em;
+            transition: all 0.2s;
+        }
+
+        .draw-btn:hover {
+            border-color: var(--accent2);
+            color: var(--accent2);
+        }
+
+        .draw-btn.primary {
+            border-color: var(--accent2);
+            color: var(--accent2);
+            background: rgba(184, 169, 255, 0.06);
+        }
+
+        .draw-btn.primary:hover {
+            background: rgba(184, 169, 255, 0.12);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+
+    <div class="shell">
+
+        <header>
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#7DF9C0" stroke-width="1.5">
+                        <path
+                            d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <div class="logo-title">CRNN·OCR</div>
+                    <div class="logo-sub">Handwriting Intelligence</div>
+                </div>
+            </div>
+            <div class="header-badges">
+                <div class="badge badge-live">Live Demo</div>
+                <div class="badge badge-model">CRNN · BiLSTM · CTC</div>
+                <!-- ✅ NEW: server status badge -->
+                <div class="badge badge-model" id="serverBadge">Checking server…</div>
+            </div>
+        </header>
+
+        <section class="hero">
+            <div class="hero-text">
+                <h1>Decode any<br><em>handwriting</em><br>instantly.</h1>
+                <p>A CNN–RNN hybrid (CRNN) architecture that extracts spatial features with convolutional layers, models
+                    character sequences with Bidirectional LSTM, and learns alignment-free with CTC loss.</p>
+                <div class="hero-stats">
+                    <div class="stat">
+                        <div class="stat-val" id="heroAcc">85<span>%</span></div>
+                        <div class="stat-label">Accuracy</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-val">0.14<span></span></div>
+                        <div class="stat-label">CER Score</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-val">7<span>×</span></div>
+                        <div class="stat-label">CNN Layers</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="arch-diagram">
+                <div class="arch-label">▸ Model Architecture</div>
+                <div class="arch-flow">
+                    <div class="arch-node out">Image<br><small style="font-size:9px;opacity:.5">32×32</small></div>
+                    <div class="arch-arrow">→</div>
+                    <div class="arch-node cnn">CNN<br><small style="font-size:9px">7 layers</small></div>
+                    <div class="arch-arrow">→</div>
+                    <div class="arch-node rnn">BiLSTM<br><small style="font-size:9px">×2 layers</small></div>
+                    <div class="arch-arrow">→</div>
+                    <div class="arch-node ctc">CTC<br><small style="font-size:9px">Loss</small></div>
+                    <div class="arch-arrow">→</div>
+                    <div class="arch-node out">Text<br><small style="font-size:9px;opacity:.5">output</small></div>
+                </div>
+                <div class="arch-detail">
+                    <div class="arch-detail-item">
+                        <div class="arch-detail-key">Optimizer</div>
+                        <div class="arch-detail-val">AdamW · lr 3e-4</div>
+                    </div>
+                    <div class="arch-detail-item">
+                        <div class="arch-detail-key">Scheduler</div>
+                        <div class="arch-detail-val">CosineAnnealing</div>
+                    </div>
+                    <div class="arch-detail-item">
+                        <div class="arch-detail-key">Input Size</div>
+                        <div class="arch-detail-val">1 × 32 × 32</div>
+                    </div>
+                    <div class="arch-detail-item">
+                        <div class="arch-detail-key">Classes</div>
+                        <div class="arch-detail-val">62 + CTC blank</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="workspace">
+
+            <div class="panel">
+                <div id="processingOverlay">
+                    <div class="scan-line"></div>
+                    <div class="processing-text">Analyzing handwriting…</div>
+                </div>
+
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <div class="panel-dot"></div> Input
+                    </div>
+                    <div class="panel-subtitle">Upload or draw</div>
+                </div>
+
+                <div class="upload-zone" id="uploadZone">
+                    <input type="file" id="fileInput" accept="image/*">
+                    <div class="upload-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#7DF9C0" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                        </svg>
+                    </div>
+                    <div class="upload-main-text">Drop image here</div>
+                    <div class="upload-sub-text">PNG, JPG, TIFF, BMP · Single handwritten character<br>Works best with
+                        dark ink on white background</div>
+                    <div class="upload-formats">
+                        <div class="format-chip">PNG</div>
+                        <div class="format-chip">JPG</div>
+                        <div class="format-chip">TIFF</div>
+                        <div class="format-chip">BMP</div>
+                    </div>
+                </div>
+
+                <div class="image-preview-wrap" id="previewWrap">
+                    <div class="image-canvas-wrap">
+                        <canvas id="previewCanvas"></canvas>
+                        <div class="image-overlay-label">INPUT · GRAYSCALE NORMALIZED</div>
+                    </div>
+                    <div class="image-meta">
+                        <div class="image-meta-item">
+                            <div class="image-meta-key">Filename</div>
+                            <div class="image-meta-val" id="metaName">—</div>
+                        </div>
+                        <div class="image-meta-item">
+                            <div class="image-meta-key">Dimensions</div>
+                            <div class="image-meta-val" id="metaDims">—</div>
+                        </div>
+                        <div class="image-meta-item">
+                            <div class="image-meta-key">Size</div>
+                            <div class="image-meta-val" id="metaSize">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="draw-section">
+                    <div class="draw-divider">or draw directly</div>
+                    <canvas id="drawCanvas"></canvas>
+                    <div class="draw-controls">
+                        <button class="draw-btn" onclick="clearDrawing()">Clear</button>
+                        <button class="draw-btn primary" onclick="useDrawing()">Use Drawing →</button>
+                    </div>
+                </div>
+
+                <div class="engine-selector">
+                    <div class="engine-label">OCR Engine / Algorithm</div>
+                    <div class="engine-options">
+                        <button class="engine-opt active" id="engCrnn" onclick="setEngine('crnn')">English
+                            (CRNN)</button>
+                        <button class="engine-opt" id="engEasy" onclick="setEngine('easyocr')">Hindi/Multi
+                            (EasyOCR)</button>
+                    </div>
+                </div>
+
+                <button class="process-btn" id="processBtn" disabled onclick="processImage()">
+                    <span class="btn-text">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                        </svg>
+                        Recognize Handwriting
+                    </span>
+                    <span class="btn-spinner">
+                        <div class="spinner"></div>Processing…
+                    </span>
+                </button>
+
+                <button class="reset-btn" id="resetBtn" onclick="resetAll()" style="display:none">↺ Reset & Upload
+                    New</button>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <div class="panel-dot" style="background:var(--accent2)"></div>Recognition Output
+                    </div>
+                    <div class="panel-subtitle" id="resultTimestamp">—</div>
+                </div>
+
+                <div class="result-empty" id="resultEmpty">
+                    <div class="result-empty-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b6a80" stroke-width="1.5">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="m21 21-4.35-4.35" />
+                        </svg>
+                    </div>
+                    <p>Upload a handwriting image or draw text to begin recognition</p>
+                </div>
+
+                <div class="result-content" id="resultContent">
+                    <div class="result-text-box">
+                        <div class="result-text-label">▸ Recognized Text</div>
+                        <div class="result-text-output" id="outputText"></div>
+                        <div class="result-chars" id="charTokens"></div>
+                        <button class="copy-btn" id="copyBtn" onclick="copyText()">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" />
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                            </svg>
+                            Copy text
+                        </button>
+                    </div>
+
+                    <div class="metrics-row">
+                        <div class="metric-card">
+                            <div class="metric-val green" id="mConf">—</div>
+                            <div class="metric-label">Confidence</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-val purple" id="mChars">—</div>
+                            <div class="metric-label">Characters</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-val orange" id="mTime">—</div>
+                            <div class="metric-label">Proc. Time</div>
+                        </div>
+                    </div>
+                    <div class="metrics-row">
+                        <div class="metric-card">
+                            <div class="metric-val green" id="mLines">—</div>
+                            <div class="metric-label">Lines</div>
+                        </div>
+                        <div class="metric-card" style="grid-column:span 2">
+                            <div class="metric-val" id="mMode" style="font-size:13px;color:var(--accent2)">—</div>
+                            <div class="metric-label">OCR Mode</div>
+                        </div>
+                    </div>
+
+                    <div class="conf-bar-wrap">
+                        <div class="conf-bar-label">
+                            <div class="conf-bar-title">Model Confidence</div>
+                            <div class="conf-bar-pct" id="confPct">0%</div>
+                        </div>
+                        <div class="conf-bar-track">
+                            <div class="conf-bar-fill" id="confBar"></div>
+                        </div>
+                    </div>
+
+                    <div class="pipeline-wrap">
+                        <div class="pipeline-title">Processing Pipeline</div>
+                        <div class="pipeline-steps">
+                            <div class="pipeline-step s1" id="ps1"></div>
+                            <div class="pipeline-sep"></div>
+                            <div class="pipeline-step s2" id="ps2"></div>
+                            <div class="pipeline-sep"></div>
+                            <div class="pipeline-step s3" id="ps3"></div>
+                            <div class="pipeline-sep"></div>
+                            <div class="pipeline-step s4" id="ps4"></div>
+                            <div class="pipeline-sep"></div>
+                            <div class="pipeline-step s5" id="ps5"></div>
+                        </div>
+                        <div class="pipeline-labels">
+                            <div class="pipeline-lbl">Preprocess</div>
+                            <div class="pipeline-lbl">CNN</div>
+                            <div class="pipeline-lbl">BiLSTM</div>
+                            <div class="pipeline-lbl">CTC</div>
+                            <div class="pipeline-lbl">Decode</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="history-section">
+            <div class="section-header">
+                <div class="section-title">Recognition History</div>
+                <div class="section-count" id="historyCount">0 items</div>
+            </div>
+            <div class="history-grid" id="historyGrid"></div>
+        </div>
+
+    </div>
+
+    <div class="toast" id="toast">
+        <div class="toast-dot"></div>
+        <span id="toastMsg"></span>
+    </div>
+
+    <script>
+        /* ═══════════════════════════════════════════════════════
+           CRNN Dashboard — connects to your local Flask server
+           Make sure server.py is running: python server.py
+           ═══════════════════════════════════════════════════════ */
+
+        // Automatic server URL detection (handles both localhost and cloud deployment)
+        const SERVER = window.location.origin;
+
+        let currentImageData = null;
+        let currentImageBase64 = null;
+        let selectedEngine = 'crnn';
+        let history = [];
+
+        function setEngine(engine) {
+            selectedEngine = engine;
+            document.getElementById('engCrnn').classList.toggle('active', engine === 'crnn');
+            document.getElementById('engEasy').classList.toggle('active', engine === 'easyocr');
+            showToast(`Engine switched to: ${engine.toUpperCase()}`);
+        }
+
+        // ✅ CHANGE 2: Check server status on page load
+        async function checkServer() {
+            const badge = document.getElementById('serverBadge');
+            try {
+                const res = await fetch(`${SERVER}/status`, { signal: AbortSignal.timeout(2500) });
+                const data = await res.json();
+                badge.textContent = `✓ CRNN · ${data.accuracy}% acc`;
+                badge.className = 'badge badge-model connected';
+                // Update hero accuracy stat to match real model
+                document.getElementById('heroAcc').innerHTML = `${data.accuracy}<span>%</span>`;
+                showToast(`Your CRNN model ready — epoch ${data.epoch}, ${data.accuracy}% accuracy`);
+            } catch {
+                badge.textContent = '⚠ Run: python server.py';
+                badge.className = 'badge badge-model offline';
+            }
+        }
+        checkServer();
+
+        // ── Drawing canvas ─────────────────────────────────────
+        const drawCanvas = document.getElementById('drawCanvas');
+        const drawCtx = drawCanvas.getContext('2d');
+        let isDrawing = false, lastX = 0, lastY = 0;
+
+        function resizeDrawCanvas() {
+            const rect = drawCanvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            drawCanvas.width = rect.width * dpr;
+            drawCanvas.height = rect.height * dpr;
+            drawCtx.scale(dpr, dpr);
+            drawCtx.strokeStyle = '#ffffff';
+            drawCtx.lineWidth = 3;
+            drawCtx.lineCap = 'round';
+            drawCtx.lineJoin = 'round';
+        }
+        resizeDrawCanvas();
+        window.addEventListener('resize', resizeDrawCanvas);
+
+        function getPos(e, canvas) {
+            const rect = canvas.getBoundingClientRect();
+            if (e.touches) return [e.touches[0].clientX - rect.left, e.touches[0].clientY - rect.top];
+            return [e.clientX - rect.left, e.clientY - rect.top];
+        }
+
+        drawCanvas.addEventListener('mousedown', e => { isDrawing = true;[lastX, lastY] = getPos(e, drawCanvas); });
+        drawCanvas.addEventListener('mousemove', e => {
+            if (!isDrawing) return;
+            const [x, y] = getPos(e, drawCanvas);
+            drawCtx.beginPath(); drawCtx.moveTo(lastX, lastY); drawCtx.lineTo(x, y); drawCtx.stroke();
+            [lastX, lastY] = [x, y];
+        });
+        drawCanvas.addEventListener('mouseup', () => { isDrawing = false; });
+        drawCanvas.addEventListener('mouseleave', () => { isDrawing = false; });
+        drawCanvas.addEventListener('touchstart', e => { e.preventDefault(); isDrawing = true;[lastX, lastY] = getPos(e, drawCanvas); });
+        drawCanvas.addEventListener('touchmove', e => {
+            e.preventDefault();
+            if (!isDrawing) return;
+            const [x, y] = getPos(e, drawCanvas);
+            drawCtx.beginPath(); drawCtx.moveTo(lastX, lastY); drawCtx.lineTo(x, y); drawCtx.stroke();
+            [lastX, lastY] = [x, y];
+        });
+        drawCanvas.addEventListener('touchend', () => { isDrawing = false; });
+
+        function clearDrawing() {
+            const rect = drawCanvas.getBoundingClientRect();
+            drawCtx.clearRect(0, 0, rect.width, rect.height);
+        }
+
+        function useDrawing() {
+            const pixels = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height).data;
+            if (!pixels.some((v, i) => i % 4 === 3 && v > 0)) { showToast('Please draw something first!'); return; }
+            loadImageFromDataUrl(drawCanvas.toDataURL('image/png'), 'drawn_input.png', null);
+            showToast('Drawing captured — ready to recognize!');
+        }
+
+        // ── File Upload ────────────────────────────────────────
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+        uploadZone.addEventListener('drop', e => {
+            e.preventDefault(); uploadZone.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) handleFile(file);
+        });
+        fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = e => loadImageFromDataUrl(e.target.result, file.name, file.size);
+            reader.readAsDataURL(file);
+        }
+
+        function loadImageFromDataUrl(dataUrl, name, size) {
+            const img = new Image();
+            img.onload = () => {
+                const pc = document.getElementById('previewCanvas');
+                const ctx = pc.getContext('2d');
+                const maxW = pc.parentElement.clientWidth;
+                const scale = Math.min(maxW / img.width, 240 / img.height, 1);
+                pc.width = img.width * scale;
+                pc.height = img.height * scale;
+                ctx.filter = 'grayscale(100%) contrast(1.2)';
+                ctx.drawImage(img, 0, 0, pc.width, pc.height);
+                ctx.filter = 'none';
+
+                currentImageBase64 = dataUrl.split(',')[1];
+                currentImageData = { name: name || 'input.png', width: img.width, height: img.height, size };
+
+                // Capture thumbnail for history immediately while it's in the canvas
+                const thumbCanvas = document.createElement('canvas');
+                const tctx = thumbCanvas.getContext('2d');
+                thumbCanvas.width = 120; thumbCanvas.height = 70;
+                tctx.fillStyle = '#1a1a24'; tctx.fillRect(0, 0, 120, 70);
+                const s = Math.min(120 / img.width, 70 / img.height);
+                tctx.drawImage(img, (120 - img.width * s) / 2, (70 - img.height * s) / 2, img.width * s, img.height * s);
+                currentImageData.thumbUrl = thumbCanvas.toDataURL('image/jpeg', 0.8);
+
+                document.getElementById('metaName').textContent = (name || 'drawn').length > 18 ? (name || 'drawn').slice(0, 15) + '…' : (name || 'drawn');
+                document.getElementById('metaDims').textContent = `${img.width}×${img.height}`;
+                document.getElementById('metaSize').textContent = size ? formatSize(size) : 'Canvas';
+
+                uploadZone.style.display = 'none';
+                document.getElementById('previewWrap').classList.add('show');
+                document.getElementById('processBtn').disabled = false;
+                document.getElementById('resetBtn').style.display = 'block';
+            };
+            img.src = dataUrl;
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1048576).toFixed(1) + ' MB';
+        }
+
+        // ── Main Processing ─────────────────────────────────────
+        async function processImage() {
+            if (!currentImageBase64) return;
+            const btn = document.getElementById('processBtn');
+            const overlay = document.getElementById('processingOverlay');
+            btn.classList.add('loading');
+            btn.disabled = true;
+            overlay.classList.add('show');
+            ['ps1', 'ps2', 'ps3', 'ps4', 'ps5'].forEach(id => document.getElementById(id).classList.remove('done'));
+
+            const startTime = Date.now();
+            try {
+                await animatePipeline();
+
+                // ✅ CHANGE 3: Call your CRNN server instead of Claude API
+                const result = await callCRNNServer(currentImageBase64);
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+                displayResult(result, elapsed);
+                addToHistory(result, currentImageData, elapsed);
+
+            } catch (err) {
+                showToast('Error: ' + err.message);
+                console.error(err);
+            } finally {
+                btn.classList.remove('loading');
+                btn.disabled = false;
+                overlay.classList.remove('show');
+            }
+        }
+
+        async function animatePipeline() {
+            const steps = ['ps1', 'ps2', 'ps3', 'ps4', 'ps5'];
+            const delays = [100, 300, 600, 900, 1100];
+            steps.forEach((id, i) => setTimeout(() => document.getElementById(id).classList.add('done'), delays[i]));
+            return new Promise(r => setTimeout(r, 1300));
+        }
+
+        // ✅ CHANGE 4: This replaces callClaudeOCR — calls your Flask server
+        async function callCRNNServer(base64Image) {
+            let response;
+            try {
+                response = await fetch(`${SERVER}/predict`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: base64Image,
+                        engine: selectedEngine
+                    }),
+                    signal: AbortSignal.timeout(60000),   // 60s for documents
+                });
+            } catch {
+                throw new Error('Cannot reach server. Run: python server.py in your terminal');
+            }
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                throw new Error(err.error || `Server error ${response.status}`);
+            }
+
+            const data = await response.json();
+            return {
+                recognized_text: data.recognized_text || '[unclear]',
+                confidence: data.confidence || 0.5,
+                char_count: data.char_count || 0,
+                line_count: data.line_count || 1,
+                mode: data.mode || 'single_char',
+                language: 'English',
+                style: 'handwritten',
+                quality: 'processed',
+                notes: `CRNN · epoch ${data.epoch} · trained acc ${data.model_accuracy}%`,
+            };
+        }
+
+        // ── Display Result ──────────────────────────────────────
+        function displayResult(result, elapsed) {
+            document.getElementById('resultEmpty').style.display = 'none';
+            document.getElementById('resultContent').classList.add('show');
+
+            const text = result.recognized_text || '';
+            document.getElementById('outputText').textContent = text;
+
+            // Character tokens — only show for short results
+            const tokenWrap = document.getElementById('charTokens');
+            tokenWrap.innerHTML = '';
+            if (text.length <= 40) {
+                [...text].forEach((ch, i) => {
+                    if (ch === '\n') return;
+                    const el = document.createElement('div');
+                    el.className = 'char-token';
+                    el.style.animationDelay = (i * 25) + 'ms';
+                    el.textContent = ch === ' ' ? '·' : ch;
+                    tokenWrap.appendChild(el);
+                });
+            }
+
+            // Update stats
+            document.getElementById('mConf').textContent = `${(result.confidence * 100).toFixed(0)}%`;
+            document.getElementById('mChars').textContent = result.char_count;
+            document.getElementById('mTime').textContent = `${elapsed}s`;
+            document.getElementById('mLines').textContent = result.line_count;
+
+            // Updated mode detection
+            let modeText = '🧩 Single Char';
+            if (result.mode === 'document') modeText = '📄 Document OCR';
+            if (result.mode === 'CRNN - Word Flow') modeText = '〰️ Word Flow';
+            if (result.mode === 'EasyOCR' || selectedEngine === 'easyocr') modeText = '🌏 EasyOCR (Word)';
+            if (result.mode === 'CRNN') modeText = '🧱 Custom CRNN';
+
+            document.getElementById('mMode').textContent = modeText;
+            document.getElementById('confPct').textContent = `${(result.confidence * 100).toFixed(0)}%`; // Assuming confPct is the same as mAccText
+            setTimeout(() => { document.getElementById('confBar').style.width = `${(result.confidence * 100)}%`; }, 100);
+            document.getElementById('resultTimestamp').textContent = new Date().toLocaleTimeString();
+            showToast(`Recognition complete · ${(result.confidence * 100).toFixed(0)}% confidence · ${result.line_count || 1} line(s)`);
+        }
+
+        // ── History ─────────────────────────────────────────────
+        function addToHistory(result, imgData, elapsed) {
+            const thumbUrl = imgData.thumbUrl || '';
+            history.unshift({ result, imgData, elapsed, thumbUrl, time: new Date() });
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const grid = document.getElementById('historyGrid');
+            document.getElementById('historyCount').textContent = `${history.length} item${history.length !== 1 ? 's' : ''}`;
+            grid.innerHTML = '';
+            history.forEach((item, i) => {
+                const card = document.createElement('div');
+                card.className = 'history-card';
+                card.style.animationDelay = (i * 50) + 'ms';
+                const conf = Math.round((item.result.confidence || 0.5) * 100);
+                const timeStr = item.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                card.innerHTML = `
+      <img class="history-thumb" src="${item.thumbUrl}" alt="thumb">
+      <div class="history-result">${item.result.recognized_text || '—'}</div>
+      <div class="history-meta">
+        <div class="history-conf">${conf}% conf</div>
+        <div class="history-time">${timeStr}</div>
+      </div>`;
+                grid.appendChild(card);
+            });
+        }
+
+        // ── Copy ────────────────────────────────────────────────
+        function copyText() {
+            const text = document.getElementById('outputText').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.classList.add('copied');
+                btn.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Copy text`;
+                }, 2000);
+            });
+        }
+
+        // ── Reset ───────────────────────────────────────────────
+        function resetAll() {
+            currentImageBase64 = null; currentImageData = null;
+            uploadZone.style.display = '';
+            document.getElementById('previewWrap').classList.remove('show');
+            document.getElementById('processBtn').disabled = true;
+            document.getElementById('resetBtn').style.display = 'none';
+            document.getElementById('resultEmpty').style.display = '';
+            document.getElementById('resultContent').classList.remove('show');
+            document.getElementById('confBar').style.width = '0';
+            fileInput.value = '';
+            clearDrawing();
+        }
+
+        // ── Toast ───────────────────────────────────────────────
+        let toastTimer;
+        function showToast(msg) {
+            const el = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = msg;
+            el.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+        }
+    </script>
+</body>
+
+</html>
